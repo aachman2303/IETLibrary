@@ -1,6 +1,5 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
-import { Book, BookRequest } from '../types';
+import { Book, BookRequest, Review } from '../types';
 import { BOOKS, BRANCHES, SUBJECTS } from '../constants';
 
 interface BookCardProps {
@@ -25,7 +24,26 @@ const BookCard: React.FC<BookCardProps> = ({ book, onAddToBag, isInBag, isOrderT
 
     return (
         <div onClick={() => onSelectBook(book)} className="bg-gray-800 rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-1 transition-transform duration-300 flex flex-col cursor-pointer">
-            <img src={book.coverImage} alt={book.title} className="w-full h-56 object-cover" />
+            <div className="relative">
+                <img src={book.coverImage} alt={book.title} className={`w-full h-56 object-cover ${!book.available ? 'filter grayscale' : ''}`} />
+                
+                {/* Status Badge */}
+                <div className={`absolute top-2 right-2 px-2 py-1 text-xs font-bold text-white rounded-full shadow-md ${
+                    book.available ? 'bg-green-600/90' : 'bg-red-600/90'
+                }`}>
+                    {book.available ? 'Available' : 'Out of Stock'}
+                </div>
+
+                {/* In Bag Indicator */}
+                {isInBag && (
+                    <div className="absolute top-2 left-2 p-1.5 bg-indigo-500/90 rounded-full text-white shadow-md" title="In your bag">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                        </svg>
+                    </div>
+                )}
+            </div>
+            
             <div className="p-4 flex flex-col flex-grow">
                 <h3 className="text-lg font-bold text-white">{book.title}</h3>
                 <p className="text-sm text-gray-400 mb-2">{book.author}</p>
@@ -34,19 +52,39 @@ const BookCard: React.FC<BookCardProps> = ({ book, onAddToBag, isInBag, isOrderT
                     <span className="text-yellow-400">★ {avgRating}</span>
                     <span className="text-gray-500 ml-2">({book.reviews.length} reviews)</span>
                 </div>
+                
+                {/* Action Button Area */}
                 {book.available ? (
                     <button
                         onClick={handleAddToBagClick}
                         disabled={isInBag || !isOrderTime}
-                        className={`w-full py-2 px-4 rounded-md text-sm font-semibold transition-colors duration-200 
-                            ${isInBag ? 'bg-gray-600 text-gray-400 cursor-default' : 
+                        className={`w-full py-2 px-4 rounded-md text-sm font-semibold transition-colors duration-200 flex items-center justify-center space-x-2 
+                            ${isInBag ? 'bg-green-600 text-white cursor-default' : 
                             !isOrderTime ? 'bg-yellow-800 text-yellow-300 cursor-not-allowed' :
                             'bg-indigo-600 text-white hover:bg-indigo-700'}`}
                     >
-                        {isInBag ? 'Added to Bag' : !isOrderTime ? 'Ordering Closed (9am-5pm)' : 'Add to Bag'}
+                        {isInBag ? (
+                            <>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                                <span>Added to Bag</span>
+                            </>
+                        ) : !isOrderTime ? (
+                            <span>Ordering Closed (9am-5pm)</span>
+                        ) : (
+                             <>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                                <span>Add to Bag</span>
+                            </>
+                        )}
                     </button>
                 ) : (
-                    <p className="text-center py-2 px-4 rounded-md bg-red-900 text-red-200 font-semibold">Out of Stock</p>
+                    <div className="text-center w-full py-2 px-4 rounded-md bg-gray-700 text-gray-400 font-semibold cursor-not-allowed">
+                        Out of Stock
+                    </div>
                 )}
             </div>
         </div>
@@ -59,15 +97,68 @@ interface CollegeBagProps {
     onOrder: (email: string) => void;
 }
 
+const generatePickupSlot = (): string => {
+    const now = new Date();
+    let pickupDate = new Date();
+    let pickupHour: number;
+
+    if (now.getHours() < 12) {
+        // Same day, random hour from 2 PM to 4 PM
+        pickupHour = Math.floor(Math.random() * 3) + 14; // 14, 15, 16
+    } else {
+        // Next day, random hour from 10 AM to 3 PM
+        pickupDate.setDate(now.getDate() + 1);
+        pickupHour = Math.floor(Math.random() * 6) + 10; // 10, 11, 12, 13, 14, 15
+    }
+
+    const displayHour = pickupHour % 12 === 0 ? 12 : pickupHour % 12;
+    const ampm = pickupHour >= 12 ? 'PM' : 'AM';
+    const timeSlot = `${displayHour}:00 - ${displayHour}:30 ${ampm}`;
+    const dateString = pickupDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+
+    return `Your estimated pickup time is ${timeSlot} on ${dateString}.`;
+}
+
+
 const CollegeBag: React.FC<CollegeBagProps> = ({ bag, onRemove, onOrder }) => {
     const [email, setEmail] = useState('');
+    const [confirmation, setConfirmation] = useState<{ message: string; email: string } | null>(null);
+
     const handleOrder = () => {
         if (email && /\S+@\S+\.\S+/.test(email)) {
+            const slotMessage = generatePickupSlot();
+            setConfirmation({
+                message: slotMessage,
+                email: email
+            });
             onOrder(email);
         } else {
             alert('Please enter a valid email address.');
         }
     };
+
+    if (confirmation) {
+        return (
+             <div className="bg-gray-800 p-6 rounded-lg shadow-lg text-center">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-500 mb-4">
+                    <svg className="h-6 w-6 text-white" stroke="currentColor" fill="none" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+                <h2 className="text-2xl font-bold mb-2 text-green-400">Order Placed!</h2>
+                <p className="text-gray-300">A confirmation email will be sent to <span className="font-semibold text-white">{confirmation.email}</span>.</p>
+                <div className="mt-4 text-lg text-yellow-300 bg-gray-900/50 border border-yellow-500/30 p-4 rounded-lg">
+                    <p className="font-semibold">Pickup Details:</p>
+                    <p>{confirmation.message}</p>
+                </div>
+                <button 
+                    onClick={() => setConfirmation(null)}
+                    className="w-full mt-6 py-2 px-4 rounded-md text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
+                    Done
+                </button>
+            </div>
+        )
+    }
 
     return (
         <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
@@ -118,6 +209,8 @@ interface SearchPageProps {
   onSelectBook: (book: Book) => void;
 }
 
+const BOOKS_PER_PAGE = 10;
+
 const SearchPage: React.FC<SearchPageProps> = ({ collegeBag, addToBag, removeFromBag, onSelectBook }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBranch, setSelectedBranch] = useState<string>('');
@@ -126,11 +219,25 @@ const SearchPage: React.FC<SearchPageProps> = ({ collegeBag, addToBag, removeFro
   const [requestIsbn, setRequestIsbn] = useState('');
   const [requestReason, setRequestReason] = useState('');
   const [isOrderTime, setIsOrderTime] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const allBooks = useMemo(() => {
     const customBooksJSON = localStorage.getItem('customBooks');
     const customBooks: Book[] = customBooksJSON ? JSON.parse(customBooksJSON) : [];
-    return [...BOOKS, ...customBooks];
+    const baseBooks = [...BOOKS, ...customBooks];
+
+    const allStoredReviewsJSON = localStorage.getItem('bookReviews');
+    const allStoredReviews: { [key: number]: Review[] } = allStoredReviewsJSON ? JSON.parse(allStoredReviewsJSON) : {};
+
+    return baseBooks.map(book => {
+        const storedReviewsForBook = allStoredReviews[book.id] || [];
+        // Combine and remove potential duplicates by stringifying
+        const combinedReviews = [...book.reviews, ...storedReviewsForBook];
+        const uniqueReviewStrings = new Set(combinedReviews.map(r => JSON.stringify(r)));
+        const uniqueReviews = Array.from(uniqueReviewStrings).map(s => JSON.parse(s));
+        
+        return { ...book, reviews: uniqueReviews };
+    });
   }, []);
 
   useEffect(() => {
@@ -158,6 +265,18 @@ const SearchPage: React.FC<SearchPageProps> = ({ collegeBag, addToBag, removeFro
     }
     return [];
   }, [searchTerm, selectedBranch, selectedSubject, allBooks]);
+
+  // Reset to first page whenever filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedBranch, selectedSubject]);
+
+  const totalPages = Math.ceil(booksToShow.length / BOOKS_PER_PAGE);
+  const paginatedBooks = useMemo(() => {
+      const startIndex = (currentPage - 1) * BOOKS_PER_PAGE;
+      return booksToShow.slice(startIndex, startIndex + BOOKS_PER_PAGE);
+  }, [booksToShow, currentPage]);
+
 
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -221,26 +340,9 @@ const SearchPage: React.FC<SearchPageProps> = ({ collegeBag, addToBag, removeFro
   };
 
   const handleOrderBooks = (email: string) => {
-    alert(`Order placed! A confirmation email has been sent to ${email}.`);
-    
-    const now = new Date();
-    const isBeforeNoon = now.getHours() < 12;
-    let slotTime;
-
-    if (isBeforeNoon) {
-        // Same day slot, avoiding 1-2 PM
-        const randomHour = Math.floor(Math.random() * 3) + 14; // 2 PM, 3 PM, 4 PM
-        slotTime = `${randomHour}:00 - ${randomHour}:30 PM on ${now.toLocaleDateString()}`;
-    } else {
-        // Next day slot
-        const tomorrow = new Date(now);
-        tomorrow.setDate(now.getDate() + 1);
-        const randomHour = Math.floor(Math.random() * 6) + 10; // 10 AM to 3 PM
-        slotTime = `${randomHour}:00 - ${randomHour}:30 ${randomHour < 12 ? 'AM' : 'PM'} on ${tomorrow.toLocaleDateString()}`;
-    }
-
-    alert(`Your time slot for pickup is: ${slotTime}. Further notifications will be sent via email.`);
-    // In a real app, this would clear the bag after order confirmation
+    console.log(`Order placed! A confirmation email has been sent to ${email}.`);
+    // In a real app, this would clear the bag after order confirmation, 
+    // for now the state is managed within the CollegeBag component itself.
     // clearBag();
   };
 
@@ -276,7 +378,7 @@ const SearchPage: React.FC<SearchPageProps> = ({ collegeBag, addToBag, removeFro
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                {booksToShow.length > 0 ? booksToShow.map(book => (
+                {paginatedBooks.length > 0 ? paginatedBooks.map(book => (
                     <BookCard 
                         key={book.id} 
                         book={book} 
@@ -342,6 +444,28 @@ const SearchPage: React.FC<SearchPageProps> = ({ collegeBag, addToBag, removeFro
                         ) : (
                             <p>Use the search bar or select a branch and subject to see available books.</p>
                         )}
+                    </div>
+                )}
+                
+                {totalPages > 1 && (
+                    <div className="col-span-full mt-8 flex justify-center items-center space-x-4">
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                            className="px-4 py-2 bg-gray-700 rounded-md text-white font-semibold hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Previous
+                        </button>
+                        <span className="text-gray-300 font-medium">
+                            Page {currentPage} of {totalPages}
+                        </span>
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={currentPage === totalPages}
+                            className="px-4 py-2 bg-gray-700 rounded-md text-white font-semibold hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Next
+                        </button>
                     </div>
                 )}
             </div>

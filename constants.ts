@@ -1,4 +1,3 @@
-
 import { Book, EBook, StudyMaterial, User } from './types';
 
 export const BRANCHES = [
@@ -7,6 +6,13 @@ export const BRANCHES = [
   'Electronics & Telecommunication',
   'Mechanical Engineering',
   'Civil Engineering',
+];
+
+export const YEARS = [
+    '1st Year',
+    '2nd Year',
+    '3rd Year',
+    '4th Year',
 ];
 
 export const SUBJECTS: { [key: string]: string[] } = {
